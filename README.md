@@ -1,63 +1,104 @@
 # MemHarbor Skill
 
-Turn a conversation into a reviewed memory draft, save approved changes, and retrieve them later. This folder is a complete standalone Skill; it does not include a server, credentials, or a hosted storage account.
+**Keep useful context for your next conversation.**
 
-## Install
+MemHarbor is a memory tool for AI agents. It turns discussions and working notes into memories you can review, update, and retrieve later—project context, decisions, troubleshooting results, and next steps.
 
-First install and sign in to your chosen AI client, and confirm normal chat works. The skills CLI installs Skill files, not the client or its login.
+Start with **the `memharbor` Skill and a local Git memory vault**, the T0 setup. Use it from Codex, Claude Code, or Cursor with authorized file/Git access. No MCP service or cloud storage account is needed.
 
-From the project where you use your agent, install from the public Skill repository:
+## How it works
+
+Tell the agent what to remember. It checks for related memories, reads existing content, and prepares a draft. Once you approve the content or explicitly ask to save it, the agent commits the changes to Git and reads them back to verify.
+
+Your memories are ordinary Markdown files in a directory you choose. They persist across sessions, with changes recorded in Git. In a new conversation, point the agent at that same directory and ask it to retrieve the context you need. Normal conversation is not saved automatically.
+
+## Quick start
+
+Have Git and a signed-in AI client ready. The installation command below also requires Node.js/npm; [manual installation](#installation-options) is available without npm.
+
+### 1. Install the Skill
+
+Run this from the project where you use your agent:
 
 ```sh
 npx skills add zyc945/memharbor-skill --skill memharbor --agent codex --copy
 ```
 
-This repository contains only the standalone Skill and does not require access to the private MemHarbor service source. For Claude Code or Cursor, replace `codex` with `claude-code` or `cursor`. Add `--global` to use the Skill across projects.
+For Claude Code or Cursor, replace `codex` with `claude-code` or `cursor`. Add `--global` to use the Skill across projects. The [Skill repository](https://github.com/zyc945/memharbor-skill) is public and needs no GitHub login. If your installed plugin already includes the Skill, skip this step.
 
-If you received a local copy instead, keep `SKILL.md`, `agents/`, and all `references/` together and install from its actual absolute path:
+Open a new client session and confirm it discovers `memharbor`. Installing the Skill supplies the agent's instructions; the next step creates the memory vault.
+
+### 2. Create your memory vault
+
+Choose a new directory separate from your software project. In Bash/Zsh:
+
+```sh
+git init -b main "$HOME/memharbor-vault"
+git -C "$HOME/memharbor-vault" var GIT_AUTHOR_IDENT
+git -C "$HOME/memharbor-vault" rev-parse --show-toplevel
+```
+
+If the identity check fails, set your own `user.name` and `user.email` with `git -C "$HOME/memharbor-vault" config user.name "Your Name"` and the corresponding `config user.email "your-email"`. These settings apply only to this vault. The last command prints the absolute path to use below. Allow your agent to access that directory through the client's permission settings.
+
+### 3. Save your first memory
+
+Replace `/absolute/path/memharbor-vault` with the path printed above, then send:
+
+```text
+Use memharbor with /absolute/path/memharbor-vault only, as a local Git memory vault.
+I authorize reading it and committing memory changes I approve. Do not add a remote.
+I plan to read one technical book each week, starting with networking fundamentals.
+I have not chosen a book yet. Check for duplicates and show me a draft; do not save yet.
+```
+
+Check the draft, then say:
+
+```text
+Save the approved draft and read it back to verify.
+```
+
+Expect the saved topic path, a Git commit, and the verification result. If the agent cannot access the directory or finish the commit, saving is incomplete.
+
+### 4. Pick it up in a new conversation
+
+Open a new session with the Skill available, replace the path as before, and send:
+
+```text
+Use memharbor with /absolute/path/memharbor-vault to find my reading plan.
+Tell me what I decided and what to do next. Read only; do not update the memory.
+```
+
+The agent should retrieve the plan from your vault, including that no book has been chosen. A read-only request should create no commit.
+
+## Everyday use
+
+Once you have specified the vault, use ordinary requests:
+
+| What you need | What to say |
+| --- | --- |
+| Resume work | “Find the project's current status, blockers, and next steps. Read only.” |
+| Save a useful result | “Draft a memory of this troubleshooting result, including the conditions and verified solution.” |
+| Update a decision | “Update the existing memory with this decision. Preserve the background and unfinished tasks; show me the changes first.” |
+
+MemHarbor updates related topics and preserves useful context. You review the content; the agent handles file organization and Git operations. You do not need to fill in IDs or API parameters.
+
+Without a remote, the vault stays on this machine. Cross-device access and backups need separate setup. Removing the Skill does not delete your saved memories.
+
+## Installation options
+
+This folder contains the complete standalone Skill. Keep `SKILL.md`, `agents/`, and all `references/` together. If you received a local copy, install it from its actual absolute path:
 
 ```sh
 npx skills add /absolute/path/memharbor --skill memharbor --agent codex --copy
 ```
 
-Both routes install the same Skill. Source-repository credentials are not required.
+Without npm, copy the complete folder to your project's `.agents/skills/memharbor` (Codex) or `.claude/skills/memharbor` (Claude Code). For Cursor, use the Skill directory supported by your installed version. Update an existing installation deliberately instead of nesting another copy inside it, then open a new session.
 
-Without npm, copy the complete folder to your project's `.agents/skills/memharbor` (Codex) or `.claude/skills/memharbor` (Claude Code). Do not overwrite or nest into an existing installation; update the old copy deliberately. Open a new session and confirm the client discovers `memharbor`. A plugin containing this Skill does not need a second standalone installation.
+## If something goes wrong
 
-## Choose where memory lives
+- **Skill not visible:** check the client and project/global installation scope, then open a new session.
+- **Vault inaccessible:** check its absolute path and the client's directory permissions.
+- **Save result unknown:** inspect the original topic path and Git history before creating another topic.
+- **Memory missing in a new session:** specify the same vault and check the previous save result.
 
-- **Existing MemHarbor MCP:** connect the service through your client's MCP settings. Use a write-capable connection to save; read-only access can still retrieve and draft. Specify the connection if several are enabled.
-- **Local Git vault:** use an independent directory with Git initialized and your Git author identity configured. Give the agent access to that directory. No MCP, Node service or cloud credentials are required. With no remote, memory is stored only on this machine.
-- **Neither configured:** the Skill can draft, but cannot claim to have checked existing memories or saved anything. Ask the agent to help choose a storage target. Never paste tokens into the conversation or memory files.
-
-## First memory
-
-For a persistent local vault, choose a new directory separate from your software project (Bash/Zsh):
-
-```sh
-git init -b main "$HOME/memharbor-vault"
-git -C "$HOME/memharbor-vault" var GIT_AUTHOR_IDENT
-```
-
-If Git reports no author identity, set your own `user.name` and `user.email` for this vault, using `git -C "$HOME/memharbor-vault" config ...`. Do not copy a fictitious identity or change global settings. Allow your agent to access this directory through its normal permission settings.
-
-For a local vault, replace the path in this prompt:
-
-```text
-Use memharbor with /absolute/path/my-memory-vault only. This is a standalone
-local Git vault; I authorize reading it and committing memory changes I approve.
-Do not add a remote or use other memory services.
-Draft this memory: I plan to read one technical book each week. I decided to
-start with networking fundamentals. No book is selected and reading has not begun.
-Check for duplicates, then show the draft without saving it.
-```
-
-Review it, then say: “Save the approved draft and read it back to verify.” Expect a real path and commit/save result. No need to enter UUIDs or Git SHAs yourself.
-
-Update: “I selected Computer Networks but have not started reading. Update that memory, preserve the decision, and add reading chapter one as the next step. Save directly and verify.”
-
-In a new session with the same vault/connection: “Use memharbor to find my reading plan and tell me my next step. Read only.” A persistent vault keeps the memory between sessions. A service launched with `--demo` does **not**; its synthetic data disappears when the process exits.
-
-For MCP use, replace the local-vault instruction with the exact connection name. Normal conversation is not automatically saved. Writes require the approved draft or an explicit request to save the specified content.
-
-Storage and recovery details are bundled in [getting started](references/getting-started.md) and [operations](references/vault-operations.md). The full source includes English/Chinese first-use guides for T1/T2 deployment and client configuration. No public source access is necessary for an already configured MCP service or this standalone T0 workflow.
+The bundled [operations reference](references/vault-operations.md) and [memory format](references/vault-format.md) describe the detailed rules (简体中文). Existing MCP users can consult the [connection notes](references/getting-started.md); the quick start above uses local Git.
